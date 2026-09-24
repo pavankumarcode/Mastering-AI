@@ -1,0 +1,149 @@
+# Module B — Evaluation with LangSmith + DeepEval (`module_b_evaluation`)
+
+This is the largest module. It covers the full evaluation stack for a multi-agent system — from creating test datasets to computing retrieval quality to using LLM-as-judge and open-source metrics.
+
+The key insight: you can't evaluate a multi-agent system like a single-chain app. Each agent has different success criteria. Routing errors cascade — if the supervisor sends a policy question to the account agent, it doesn't matter how good the account agent is.
+
+---
+
+## What this module teaches
+
+> "You can't improve what you can't measure."
+
+Six evaluation techniques, each targeting a different layer of the system:
+
+| Technique | What it measures | Layer |
+|-----------|-----------------|-------|
+| Evaluation datasets | Ground truth for comparison | Foundation |
+| Custom evaluators | Routing accuracy, keyword correctness | Supervisor |
+| LLM-as-judge | Faithfulness, correctness | Policy + Account agents |
+| MRR (Mean Reciprocal Rank) | How quickly the retriever finds the right doc | Retriever |
+| DeepEval metrics | Faithfulness, hallucination, answer relevancy | End-to-end |
+| G-Eval | Custom criteria in plain English (e.g., empathy) | Escalation agent |
+
+---
+
+## File breakdown
+
+### `demo.py` — Dataset creation and A/B experiments
+
+Does two things:
+
+1. **Creates a LangSmith dataset** called `fintech-demo-hill-climb` with 8 policy-focused examples. All require precise numbers (fees, APRs, limits), making every example sensitive to retrieval quality. Using a policy-only dataset avoids dilution from account/escalation queries that don't use RAG.
+
+2. **Runs two experiments** against the same dataset with routing and keyword correctness evaluators, both using `top_k=1` (single chunk retrieval):
+   - **v1-baseline**: `chunk_size=100, top_k=1` (tiny fragment — key numbers split across chunks)
+   - **v2-improved**: `chunk_size=1500, top_k=1` (full section intact — all details preserved)
+   
+   One change, one variable (`chunk_size`). With `top_k=1`, the single retrieved chunk either has the answer or doesn't — this amplifies the effect of chunk size. This demonstrates the **observe → tweak → re-evaluate** improvement loop.
+
+**What to watch for when you run it:**
+- Does every example get routed to the correct agent?
+- How dramatically does keyword_correctness jump from v1 to v2?
+- Can you see the comparison in the LangSmith UI?
+
+### `exercise.py` — Build the full evaluation stack
+
+Ten TODOs covering all six techniques:
+
+| TODO | What you do |
+|------|-------------|
+| 1 | Implement `run_agent()` — wrap the multi-agent graph for evaluation |
+| 2 | Write `routing_evaluator()` — compare predicted vs expected intent |
+| 3 | Write `faithfulness_evaluator()` — LLM-as-judge, score 0–1 |
+| 4 | Write `correctness_evaluator()` — LLM-as-judge, compare to reference |
+| 5 | Run `evaluate()` in LangSmith with all evaluators |
+| 6 | Compute MRR across 10 retrieval queries |
+| 7 | Run DeepEval metrics (faithfulness, hallucination, answer relevancy) |
+| 8 | Build a G-Eval empathy metric for escalation responses |
+| 9 | Add new evaluation examples to improve dataset coverage |
+| 10 | Hill climbing — improve correctness by changing ONE variable |
+
+### `solution.py` — Reference implementation
+
+Complete working code for all 10 TODOs: evaluators, MRR computation, DeepEval assert_test, G-Eval empathy scoring, expanded dataset, and hill climbing optimization.
+
+### `notes.md` — Concepts
+
+Covers: why labeled data matters for multi-agent systems, dataset format, MRR formula and interpretation, DeepEval vs LangSmith comparison, G-Eval criteria design, and the observe→evaluate→compare→improve loop.
+
+---
+
+## How to run
+
+Each file is self-contained — they can be run in any order. Each file creates its own LangSmith dataset (`fintech-demo-hill-climb`, `fintech-exercise-eval`, `fintech-solution-eval`) so experiments never collide.
+
+```bash
+# Run from the project root directory
+
+# Part 1: Create dataset + run A/B experiments
+python module_b_evaluation/demo.py
+
+# Part 2: Complete all evaluation exercises
+python module_b_evaluation/exercise.py
+
+# Part 3: Check against the solution
+python module_b_evaluation/solution.py
+```
+
+**What to expect from `demo.py`:**
+- Creates a dataset with 8 policy-focused examples in LangSmith
+- Runs the agent on all examples **3 times each** (`num_repetitions=3`) to smooth out LLM non-determinism — single runs are noisy, averaged scores give reliable comparisons
+- Prints routing accuracy and keyword correctness per example
+- To compare side-by-side:
+  1. Open LangSmith → **Datasets & Experiments** (left sidebar) → click **`fintech-demo-hill-climb`**
+  2. On the **Experiments** tab, check the boxes next to both experiments
+  3. Click the **Compare** button that appears at the bottom of the page
+  4. This opens a row-by-row comparison of every example's scores across both experiments
+
+**Expected results:**
+
+| Experiment | keyword_correctness | routing_accuracy | What changed |
+|---|---|---|---|
+| `demo-v1-baseline` | ~0.25–0.40 | 1.00 | `chunk_size=100, top_k=1` — tiny fragments, key numbers missing |
+| `demo-v2-improved` | ~0.70–0.85 | 1.00 | `chunk_size=1500, top_k=1` — full policy sections intact |
+
+Key observations:
+- **Routing accuracy = 1.00** in both — the supervisor correctly classifies every query regardless of chunk size.
+- **keyword_correctness jumps dramatically in v2** — same model, same prompt, same `top_k=1`, only chunk size changes. With `chunk_size=100`, a single tiny chunk almost never contains all the numbers the LLM needs. With `chunk_size=1500`, the full policy section fits in one chunk.
+- **This is the evaluation hill-climbing loop**: observe a low score → hypothesize a fix (better chunking) → re-evaluate → confirm improvement.
+
+> **Why this works**: With `top_k=1`, each query retrieves exactly ONE chunk. The `keyword_correctness` evaluator extracts numbers and dollar amounts from the expected answer and checks if they appear in the response. At `chunk_size=100`, a single chunk is ~15 words — sentences like "$35 per transaction, maximum 3 per day ($105)" get split, so the LLM only sees fragments. At `chunk_size=1500`, the full section with all numbers stays together in that one chunk.
+>
+> **Why policy-only examples**: A mixed dataset with account lookups and escalation queries dilutes the effect — those paths don't use RAG, so they score identically regardless of chunk size. By using only policy questions (all requiring precise numbers), every single example is affected by the change.
+
+**What to expect from `solution.py`:**
+- Runs all LangSmith evaluators (routing, faithfulness, correctness)
+- Computes MRR across 10 queries and prints the score
+- Runs DeepEval metrics if installed (`pip install deepeval`)
+- Runs G-Eval empathy metric on escalation queries
+- DeepEval and G-Eval sections gracefully skip if not installed
+
+---
+
+## What problem does each evaluator solve?
+
+```
+Multi-Agent System
+  |
+  +-- Supervisor         -> routing_evaluator         (did it classify correctly?)
+  |
+  +-- Policy Agent       -> faithfulness_evaluator    (is it grounded in context?)
+  |                      -> MRR                       (did retriever find the right doc?)
+  |
+  +-- Account Agent      -> correctness_evaluator    (do account details match?)
+  |
+  +-- Escalation Agent   -> G-Eval (empathy)          (is it genuinely empathetic?)
+  |
+  +-- End-to-end         -> DeepEval (hallucination)  (did it make things up?)
+```
+
+---
+
+## Quick mental model
+
+- **Routing accuracy** is the most critical metric — wrong agent = wrong answer, regardless of agent quality.
+- **MRR** measures retrieval, not generation. MRR = 1.0 means the relevant doc is always ranked first.
+- **Faithfulness** ≠ factual correctness. Faithfulness = grounded in the provided context. An answer can be faithful to wrong context.
+- **G-Eval scores vary between runs.** Average over 3+ runs. Criteria quality directly determines score quality.
+- **DeepEval's "faithfulness"** means faithful to provided context, NOT factually correct. "Hallucination" means the output contains info NOT in the context.
