@@ -1,0 +1,85 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Real Estate Negotiation Workshop — Python Dependencies
+# ═══════════════════════════════════════════════════════════════════════
+#
+# INSTALL:
+#   pip install -r requirements.txt
+#
+# PYTHON VERSION: 3.10+ required (uses match statements, TypeAlias, etc.)
+#
+# EXTERNAL REQUIREMENTS (not pip):
+#   • Node.js 18+ (for GitHub MCP server demo)
+#     Install: https://nodejs.org
+#   • npx (comes with Node.js)
+#   • MCP Inspector (optional — visual host GUI for browsing a server's
+#     tools/resources/prompts). Runs via npx, no install needed:
+#       npx @modelcontextprotocol/inspector python m1_mcp/inventory_server.py
+#
+# API KEYS NEEDED:
+#   Simple version: export OPENAI_API_KEY=sk-...
+#   ADK version:    export OPENAI_API_KEY=sk-...
+#   GitHub demo:    export GITHUB_TOKEN=ghp_...
+# ═══════════════════════════════════════════════════════════════════════
+
+
+# ── MCP (Model Context Protocol) ────────────────────────────────────────────
+# Core MCP library — client and server (FastMCP included)
+mcp>=1.0.0
+
+
+# ── LLM Providers ────────────────────────────────────────────────────────────
+
+# OpenAI — powers the simple Python agents (GPT-4o)
+openai>=1.40.0
+
+# Google ADK — powers the ADK agents (OpenAI-backed model runtime)
+google-adk>=1.0.0
+
+# LiteLLM — required by ADK for provider-style model IDs (e.g., openai/gpt-4o)
+litellm>=1.75.5
+
+# Google Agent2Agent protocol SDK (true networked A2A)
+a2a-sdk>=0.3.24,<1.0.0              # A2A protocol SDK (v1.x is incompatible with google-adk <2.0)
+
+
+# ── Data Validation ───────────────────────────────────────────────────────────
+
+# Pydantic — A2A message schema validation
+pydantic>=2.0.0
+
+
+# ── Async & HTTP ─────────────────────────────────────────────────────────────
+
+# httpx — async HTTP client (used internally by some libraries)
+httpx>=0.27.0
+
+# aiofiles — async file operations (optional, for logging)
+aiofiles>=23.0.0
+
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+
+# python-dotenv — load .env files for API keys
+python-dotenv>=1.0.0
+
+# typing-extensions — backports of newer typing features
+typing-extensions>=4.0.0
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+# Streamlit — negotiation dashboard UI (Module 2)
+streamlit>=1.35.0
+
+# pandas — data manipulation for the dashboard chart
+pandas>=2.0.0
+
+
+# ── Development Tools (optional) ─────────────────────────────────────────────
+
+# pytest + pytest-asyncio — for running tests
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# rich — beautiful terminal output (optional, used in some demos)
+# rich>=13.0.0
